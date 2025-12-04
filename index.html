@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Jenkins Dashboard (Fixed)</title>
+  <meta name="description" content="Modern Jenkins Dashboard - Monitor and manage your CI/CD pipelines" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen overflow-hidden flex">
+
+  <!-- Toast -->
+  <div id="toast" class="fixed top-4 right-4 z-50 hidden" role="status" aria-live="polite">
+    <div id="toastContent" class="bg-white border-l-4 rounded-lg shadow-lg p-4 max-w-md">
+      <div class="flex items-center gap-3">
+        <i id="toastIcon" class="fas fa-info-circle text-blue-600 text-xl" aria-hidden="true"></i>
+        <p id="toastMessage" class="text-sm text-slate-700"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200">
+      <div class="text-center mb-6">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 mb-4">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Jenkins_logo.svg/1483px-Jenkins_logo.svg.png"
+            class="w-12 h-12" alt="Jenkins Logo">
+        </div>
+        <h2 class="text-2xl font-bold text-slate-800">Jenkins Dashboard</h2>
+        <p class="text-slate-500 mt-1">Connect to your Jenkins instance</p>
+      </div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label for="jenkinsUrl" class="block text-sm font-medium text-slate-600 mb-1">Jenkins URL</label>
+          <input id="jenkinsUrl" type="url" placeholder="http://localhost:8080" required
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-3 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+          <label for="username" class="block text-sm font-medium text-slate-600 mb-1">Username</label>
+          <input id="username" type="text" placeholder="admin" required
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-3 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+          <label for="apiToken" class="block text-sm font-medium text-slate-600 mb-1">API Token</label>
+          <input id="apiToken" type="password" placeholder="API token" required
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-3 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none">
+          <p class="text-xs text-slate-500 mt-1">Get from Jenkins → Your User → Configure → API Token</p>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">Connect</button>
+          <button id="demoModeBtn" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg">
+            <i class="fas fa-rocket mr-2"></i> Demo
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm z-40 fixed h-full hidden md:flex">
+    <div class="p-6 flex items-center gap-3 border-b border-slate-100">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Jenkins_logo.svg/1483px-Jenkins_logo.svg.png" class="w-8 h-8" alt="Logo">
+      <span class="font-bold text-lg tracking-wide text-slate-800">Jenkins</span>
+    </div>
+    <nav class="p-4 space-y-2 flex-1">
+      <button data-view="dashboard" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-50 text-blue-600 font-medium"> <i class="fas fa-chart-pie"></i> Dashboard</button>
+      <button data-view="pipelines" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-blue-50"> <i class="fas fa-stream"></i> Pipelines</button>
+      <button data-view="builds" class="nav-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-blue-50"> <i class="fas fa-history"></i> Recent Builds</button>
+    </nav>
+    <div class="p-4 border-t border-slate-100">
+      <div class="flex items-center gap-3 mb-4 px-2">
+        <div id="userAvatar" class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">D</div>
+        <div class="flex-1 overflow-hidden">
+          <p id="displayUsername" class="text-sm font-medium truncate text-slate-700">Demo User</p>
+          <p id="displayUrl" class="text-xs text-slate-400 truncate">demo mode</p>
+        </div>
+      </div>
+      <button id="logoutBtn" class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">
+        <i class="fas fa-sign-out-alt"></i> Disconnect
+      </button>
+    </div>
+  </aside>
+
+  <!-- Top bar and content -->
+  <div class="flex-1 flex flex-col md:ml-64">
+    <header class="h-16 bg-white/80 border-b border-slate-200 flex items-center justify-between px-6">
+      <h1 id="pageTitle" class="text-xl font-bold text-slate-800">Overview</h1>
+      <div class="flex items-center gap-4">
+        <div class="relative">
+          <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input id="searchInput" class="bg-slate-100 border border-slate-200 rounded-full pl-10 pr-4 py-1.5 text-sm w-64" placeholder="Search pipelines..." />
+        </div>
+        <button id="refreshBtn" title="Refresh" class="p-2 text-slate-400 hover:text-blue-600">
+          <i id="refreshIcon" class="fas fa-sync-alt"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-auto p-6">
+      <!-- dashboard -->
+      <section id="view-dashboard" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <p class="text-slate-500 text-sm">Total Pipelines</p>
+            <h3 id="statTotal" class="text-3xl font-bold mt-1">0</h3>
+          </div>
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <p class="text-slate-500 text-sm">Success Rate</p>
+            <h3 id="statSuccess" class="text-3xl font-bold mt-1 text-green-600">0%</h3>
+          </div>
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <p class="text-slate-500 text-sm">Active Builds</p>
+            <h3 id="statRunning" class="text-3xl font-bold mt-1 text-amber-500">0</h3>
+          </div>
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <p class="text-slate-500 text-sm">Failed (24h)</p>
+            <h3 id="statFailed" class="text-3xl font-bold mt-1 text-red-600">0</h3>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-white p-6 rounded-xl border shadow-sm lg:col-span-2">
+            <h3 class="font-bold mb-4">Build Duration Trend</h3>
+            <div class="h-64">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <h3 class="font-bold mb-4">Status Distribution</h3>
+            <div class="h-64 flex items-center justify-center">
+              <canvas id="statusChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- pipelines -->
+      <section id="view-pipelines" class="hidden">
+        <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 text-slate-500 text-sm uppercase">
+              <tr>
+                <th class="p-4 w-12 text-center">Status</th>
+                <th class="p-4 w-12 text-center">Health</th>
+                <th class="p-4">Name</th>
+                <th class="p-4">Last Success</th>
+                <th class="p-4">Last Failure</th>
+                <th class="p-4">Last Duration</th>
+                <th class="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pipelineTableBody" class="text-sm text-slate-700"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- builds -->
+      <section id="view-builds" class="hidden">
+        <div class="bg-white rounded-xl border shadow-sm p-8 text-center">
+          <i class="fas fa-history text-6xl text-slate-300 mb-4"></i>
+          <h3 class="text-xl font-bold text-slate-800 mb-2">Recent Builds</h3>
+          <p class="text-slate-500">Build history view coming soon...</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ========== constants & state ==========
+    const REFRESH_INTERVAL = 30000;
+    const RETRY_DELAY = 1500;
+    const ONE_HOUR_MS = 3600 * 1000;
+    const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+
+    const state = {
+      creds: null,
+      pipelines: [],
+      filteredPipelines: [],
+      refreshInterval: null,
+      demoMode: false,
+      charts: { status: null, trend: null },
+      crumbCache: null,
+      crumbFetchedAt: 0
+    };
+
+    // demo data (used when demo mode active)
+    const DEMO_PIPELINES = [
+      { displayName: 'Frontend-Build-Deploy', color: 'blue', url: '#', healthReport: [{score:95}], lastSuccessfulBuild:{number:142,timestamp:Date.now()-ONE_HOUR_MS}, lastFailedBuild:{number:128,timestamp:Date.now()-ONE_DAY_MS*3}, lastBuild:{number:142,timestamp:Date.now()-ONE_HOUR_MS,duration:245000} },
+      { displayName: 'Backend-API-Tests', color: 'blue', url: '#', healthReport: [{score:88}], lastSuccessfulBuild:{number:234,timestamp:Date.now()-7200000}, lastFailedBuild:{number:220,timestamp:Date.now()-ONE_DAY_MS*5}, lastBuild:{number:234,timestamp:Date.now()-7200000,duration:180000} },
+      { displayName: 'Database-Migration', color: 'red', url: '#', healthReport: [{score:45}], lastSuccessfulBuild:{number:67,timestamp:Date.now()-ONE_DAY_MS*2}, lastFailedBuild:{number:68,timestamp:Date.now()-1800000}, lastBuild:{number:68,timestamp:Date.now()-1800000,duration:420000} }
+    ];
+
+    // ========== utilities ==========
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const icon = document.getElementById('toastIcon');
+      const content = document.getElementById('toastContent');
+      const msg = document.getElementById('toastMessage');
+
+      const iconMap = {
+        info: { icon: 'fa-info-circle', color: 'text-blue-600', border: 'border-blue-600' },
+        success: { icon: 'fa-check-circle', color: 'text-green-600', border: 'border-green-600' },
+        error: { icon: 'fa-exclamation-circle', color: 'text-red-600', border: 'border-red-600' },
+        warning: { icon: 'fa-exclamation-triangle', color: 'text-amber-600', border: 'border-amber-600' }
+      };
+
+      const cfg = iconMap[type] || iconMap.info;
+      icon.className = fas ${cfg.icon} ${cfg.color} text-xl;
+      content.className = bg-white border-l-4 ${cfg.border} rounded-lg shadow-lg p-4 max-w-md;
+      msg.textContent = message;
+
+      toast.classList.remove('hidden');
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => toast.classList.add('hidden'), 5000);
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function formatDuration(ms) {
+      if (ms === null || ms === undefined) return '-';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return ${s} sec;
+      const m = Math.floor(s / 60);
+      if (m < 60) return ${m} min ${s % 60} sec;
+      const h = Math.floor(m / 60);
+      return ${h} hr ${m % 60} min;
+    }
+
+    function timeAgo(timestamp) {
+      if (!timestamp) return 'N/A';
+      const diff = Date.now() - timestamp;
+      const s = Math.floor(diff / 1000);
+      const m = Math.floor(s / 60);
+      const h = Math.floor(m / 60);
+      const d = Math.floor(h / 24);
+      if (d > 0) return ${d} days ${h % 24} hr;
+      if (h > 0) return ${h} hr ${m % 60} min;
+      if (m > 0) return ${m} min;
+      return ${s} sec;
+    }
+
+    function getWeatherIcon(score) {
+      if (score >= 80) return 'fa-sun text-yellow-500';
+      if (score >= 60) return 'fa-cloud-sun text-yellow-400';
+      if (score >= 40) return 'fa-cloud text-slate-400';
+      if (score >= 20) return 'fa-cloud-rain text-blue-400';
+      return 'fa-bolt text-red-500';
+    }
+
+    // ========== auth & API helpers ==========
+    const getAuthHeader = () => 'Basic ' + btoa(${state.creds.user}:${state.creds.token});
+
+    function buildUrl(endpoint) {
+      // If endpoint is absolute URL (https?://) return it directly.
+      if (/^https?:\/\//i.test(endpoint)) return endpoint;
+      if (!state.creds || !state.creds.url) throw new Error('No Jenkins URL in credentials');
+      const base = state.creds.url.replace(/\/$/, '');
+      return ${base}/${endpoint.replace(/^\/+/, '')};
+    }
+
+    async function getCrumb(force = false) {
+      const now = Date.now();
+      if (!force && state.crumbCache && (now - state.crumbFetchedAt) < (4 * 60 * 1000)) return state.crumbCache;
+      try {
+        const url = buildUrl('crumbIssuer/api/json');
+        const res = await fetch(url, { headers: { 'Authorization': getAuthHeader() } });
+        if (!res.ok) {
+          if (res.status === 404) return null; // crumb not required
+          if (res.status === 403) throw new Error('Forbidden fetching crumb (check credentials)');
+          return null;
+        }
+        const data = await res.json();
+        if (data && data.crumb && data.crumbRequestField) {
+          state.crumbCache = data;
+          state.crumbFetchedAt = Date.now();
+          return data;
+        }
+        return null;
+      } catch (e) {
+        console.warn('crumb error', e);
+        return null;
+      }
+    }
+
+    async function jenkinsFetch(endpoint, options = {}) {
+      // endpoint may be absolute or relative
+      try {
+        const url = buildUrl(endpoint);
+        const headers = { ...(options.headers || {}) };
+
+        // If we have credentials add Authorization
+        if (state.creds) headers['Authorization'] = getAuthHeader();
+
+        const method = (options.method || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD') {
+          // attach crumb if available
+          const crumb = await getCrumb();
+          if (crumb) headers[crumb.crumbRequestField] = crumb.crumb;
+        }
+
+        const res = await fetch(url, { ...options, headers });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          throw new Error(HTTP ${res.status} ${res.statusText} ${txt ? '- ' + txt.slice(0,200) : ''});
+        }
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) return await res.json();
+        return await res.text();
+      } catch (err) {
+        console.error('jenkinsFetch', err);
+        // Show short helpful toast
+        if (err.message.includes('Failed to fetch')) {
+          showToast('Network error or CORS blocked. Check browser console and Jenkins CORS settings.', 'error');
+        } else {
+          showToast(err.message, 'error');
+        }
+        return null;
+      }
+    }
+
+    // ========== job flattening (handles nested folders & multibranch) ==========
+    // We fetch api/json?depth=3 to get nested jobs; flattenJobs returns a flat list with full path displayName.
+    function flattenJobs(jobs, parentParts = []) {
+      const result = [];
+      if (!Array.isArray(jobs)) return result;
+      for (const j of jobs) {
+        const parts = parentParts.concat([j.name]);
+        // if j has url and color => real job (not only folder container)
+        // For multibranch or folder that contains jobs, we still traverse children (j.jobs)
+        if (j.url && (j.color || !j.jobs)) {
+          result.push({
+            displayName: parts.join('/'),
+            name: j.name,
+            url: j.url, // absolute URL returned by Jenkins, convenient for triggers
+            color: j.color,
+            healthReport: j.healthReport,
+            lastSuccessfulBuild: j.lastSuccessfulBuild,
+            lastFailedBuild: j.lastFailedBuild,
+            lastBuild: j.lastBuild
+          });
+        }
+        if (j.jobs && Array.isArray(j.jobs) && j.jobs.length > 0) {
+          result.push(...flattenJobs(j.jobs, parts));
+        }
+        // Some multibranch branches appear under 'items' not 'jobs' (older plugin variations)
+        if (j.items && Array.isArray(j.items) && j.items.length > 0) {
+          result.push(...flattenJobs(j.items, parts));
+        }
+      }
+      return result;
+    }
+
+    // ========== core logic: fetch & render ==========
+    async function refreshData() {
+      if (state.demoMode) return;
+      const icon = document.getElementById('refreshIcon');
+      icon.classList.add('fa-spin');
+      try {
+        // Use depth=3 to include folders and multibranch branches (adjust depth if you have deeper nesting)
+        const endpoint = 'api/json?depth=3';
+        const data = await jenkinsFetch(endpoint);
+        if (!data) {
+          showToast('Unable to fetch data from Jenkins.', 'error');
+          return;
+        }
+        const jobsRoot = data.jobs || [];
+        const flat = flattenJobs(jobsRoot, []);
+        state.pipelines = flat;
+        state.filteredPipelines = flat;
+        renderStats();
+        renderPipelines();
+        renderCharts();
+        showToast('Data refreshed', 'success');
+      } catch (e) {
+        console.error(e);
+        showToast('Failed to refresh data', 'error');
+      } finally {
+        icon.classList.remove('fa-spin');
+      }
+    }
+
+    function renderStats() {
+      const pipelines = state.filteredPipelines || [];
+      const total = pipelines.length;
+      const success = pipelines.filter(j => j.color === 'blue').length;
+      const failed = pipelines.filter(j => j.color === 'red').length;
+      const running = pipelines.filter(j => j.color && j.color.includes('anime')).length;
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statSuccess').textContent = total ? Math.round((success / total) * 100) + '%' : '0%';
+      document.getElementById('statRunning').textContent = running;
+      document.getElementById('statFailed').textContent = failed;
+    }
+
+    function renderPipelines() {
+      const tbody = document.getElementById('pipelineTableBody');
+      const pipelines = state.filteredPipelines || [];
+
+      if (pipelines.length === 0) {
+        tbody.innerHTML = <tr><td colspan="7" class="p-8 text-center text-slate-400"> <i class="fas fa-info-circle text-3xl mb-2"></i><p>No pipelines found</p></td></tr>;
+        return;
+      }
+
+      tbody.innerHTML = pipelines.map(job => {
+        const isRunning = job.color && job.color.includes('anime');
+        const statusColor = isRunning ? 'text-blue-500' : (job.color === 'blue' ? 'text-green-500' : (job.color === 'red' ? 'text-red-500' : 'text-slate-400'));
+        const statusIcon = isRunning ? 'fa-spinner fa-spin' : (job.color === 'blue' ? 'fa-check-circle' : (job.color === 'red' ? 'fa-times-circle' : 'fa-circle'));
+        const weatherScore = job.healthReport?.[0]?.score ?? 100;
+        const weatherIconClass = getWeatherIcon(weatherScore);
+        const safeName = escapeHtml(job.displayName);
+        const lastSuccess = job.lastSuccessfulBuild ? ${timeAgo(job.lastSuccessfulBuild.timestamp)} <span class="text-blue-500 ml-1">#${job.lastSuccessfulBuild.number}</span> : 'N/A';
+        const lastFailure = job.lastFailedBuild ? ${timeAgo(job.lastFailedBuild.timestamp)} <span class="text-blue-500 ml-1">#${job.lastFailedBuild.number}</span> : 'N/A';
+        const duration = job.lastBuild ? escapeHtml(formatDuration(job.lastBuild.duration)) : '-';
+
+        return `
+          <tr class="hover:bg-slate-50 transition cursor-pointer group border-b" data-job-url="${escapeHtml(job.url)}">
+            <td class="p-4 text-center"><i class="fas ${statusIcon} ${statusColor} text-lg"></i></td>
+            <td class="p-4 text-center"><i class="fas ${weatherIconClass} text-lg" title="Health: ${weatherScore}%"></i></td>
+            <td class="p-4 font-medium text-blue-600">${safeName}</td>
+            <td class="p-4 text-slate-600 text-sm">${lastSuccess}</td>
+            <td class="p-4 text-slate-600 text-sm">${lastFailure}</td>
+            <td class="p-4 text-slate-600 text-sm">${duration}</td>
+            <td class="p-4 text-right">
+              <button class="trigger-build-btn w-8 h-8 flex items-center justify-center rounded-full hover:bg-blue-50 text-green-500" title="Run" data-job-url="${escapeHtml(job.url)}"><i class="fas fa-play"></i></button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // attach events
+      tbody.querySelectorAll('.trigger-build-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          const jobUrl = btn.getAttribute('data-job-url');
+          await triggerBuild(jobUrl);
+        };
+      });
+
+      tbody.querySelectorAll('tr[data-job-url]').forEach(row => {
+        row.onclick = () => {
+          const url = row.getAttribute('data-job-url');
+          showToast(Open job in Jenkins: ${url}, 'info');
+          // optional: open job URL in new tab
+          // window.open(url, '_blank');
+        }
+      });
+    }
+
+    function renderCharts() {
+      const pipelines = state.filteredPipelines || [];
+      // status chart
+      const success = pipelines.filter(j => j.color === 'blue').length;
+      const failed = pipelines.filter(j => j.color === 'red').length;
+      const other = Math.max(0, pipelines.length - success - failed);
+
+      const ctxStatus = document.getElementById('statusChart').getContext('2d');
+      if (state.charts.status) state.charts.status.destroy();
+      state.charts.status = new Chart(ctxStatus, {
+        type: 'pie',
+        data: { labels: ['Success','Failed','Other'], datasets: [{ data: [success,failed,other], backgroundColor: ['#22c55e','#ef4444','#94a3b8'] }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      // trend chart
+      const labels = pipelines.map(p => p.displayName.length > 20 ? p.displayName.substring(0,18)+'...' : p.displayName);
+      const data = pipelines.map(p => p.lastBuild ? (p.lastBuild.duration/1000) : 0);
+      const ctxTrend = document.getElementById('trendChart').getContext('2d');
+      if (state.charts.trend) state.charts.trend.destroy();
+      state.charts.trend = new Chart(ctxTrend, {
+        type: 'bar',
+        data: { labels, datasets: [{ label:'Duration (s)', data, backgroundColor:'#3b82f6', borderRadius:4, barThickness:20 }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true }, x:{ ticks:{ maxRotation:45, minRotation:45 } } } }
+      });
+    }
+
+    // ========== trigger build ==========
+    async function triggerBuild(jobUrl) {
+      if (!confirm('Trigger build for this job?')) return;
+      if (state.demoMode) {
+        showToast('Demo mode: would trigger build.', 'info');
+        return;
+      }
+      try {
+        // jobUrl is absolute (as returned by Jenkins)
+        // Ensure it ends with a slash
+        const url = jobUrl.endsWith('/') ? jobUrl : jobUrl + '/';
+        const endpoint = url + 'build'; // build or buildWithParameters if needed
+        const res = await jenkinsFetch(endpoint, { method: 'POST' });
+        // Jenkins often returns empty body; treat non-null or successful fetch as success
+        showToast('Build triggered successfully (check Jenkins).', 'success');
+        // refresh in a bit to reflect running status
+        setTimeout(refreshData, RETRY_DELAY);
+      } catch (e) {
+        console.error(e);
+        showToast('Failed to trigger build. Check credentials, crumb, and CORS.', 'error');
+      }
+    }
+
+    // ========== search & UI helpers ==========
+    function filterPipelines(term) {
+      const t = (term || '').toLowerCase().trim();
+      state.filteredPipelines = t ? state.pipelines.filter(p => p.displayName.toLowerCase().includes(t)) : state.pipelines;
+      renderStats();
+      renderPipelines();
+      renderCharts();
+    }
+
+    function switchView(view) {
+      ['dashboard','pipelines','builds'].forEach(v=>{
+        const el = document.getElementById('view-'+v);
+        if (!el) return;
+        if (v === view) el.classList.remove('hidden'); else el.classList.add('hidden');
+      });
+      document.getElementById('pageTitle').textContent = view.charAt(0).toUpperCase() + view.slice(1);
+      document.querySelectorAll('.nav-item').forEach(btn=>{
+        if (btn.getAttribute('data-view') === view) {
+          btn.classList.add('bg-blue-50','text-blue-600'); btn.classList.remove('text-slate-600');
+        } else { btn.classList.remove('bg-blue-50','text-blue-600'); btn.classList.add('text-slate-600'); }
+      });
+    }
+
+    // ========== auth / session ==========
+    function updateUserDisplay() {
+      const usernameEl = document.getElementById('displayUsername');
+      const urlEl = document.getElementById('displayUrl');
+      const avatar = document.getElementById('userAvatar');
+      usernameEl.textContent = state.creds.user;
+      avatar.textContent = state.creds.user.charAt(0).toUpperCase();
+      try { urlEl.textContent = new URL(state.creds.url).hostname; } catch { urlEl.textContent = state.creds.url; }
+    }
+
+    // ========== event wiring ==========
+    document.getElementById('demoModeBtn').addEventListener('click', () => {
+      state.demoMode = true;
+      state.pipelines = DEMO_PIPELINES;
+      state.filteredPipelines = DEMO_PIPELINES;
+      document.getElementById('loginModal').classList.add('hidden');
+      updateUserDisplay();
+      showToast('Demo mode activated', 'success');
+      renderStats(); renderPipelines(); renderCharts();
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const url = document.getElementById('jenkinsUrl').value.replace(/\/$/, '');
+      const user = document.getElementById('username').value.trim();
+      const token = document.getElementById('apiToken').value.trim();
+      if (!url || !user || !token) { showToast('Fill all fields', 'warning'); return; }
+      state.creds = { url, user, token };
+      sessionStorage.setItem('jenkins_creds', JSON.stringify(state.creds));
+      state.demoMode = false;
+      document.getElementById('loginModal').classList.add('hidden');
+      updateUserDisplay();
+      // start fetching
+      refreshData();
+      if (state.refreshInterval) clearInterval(state.refreshInterval);
+      state.refreshInterval = setInterval(refreshData, REFRESH_INTERVAL);
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      sessionStorage.removeItem('jenkins_creds');
+      state.creds = null;
+      window.location.reload();
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', refreshData);
+    document.getElementById('searchInput').addEventListener('input', (e) => filterPipelines(e.target.value));
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+    });
+
+    // keyboard shortcut: r to refresh
+    window.addEventListener('keydown', (e) => { if (e.key === 'r' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); refreshData(); } });
+
+    // ========== initialization ==========
+    (function init() {
+      // Restore creds if present
+      const stored = sessionStorage.getItem('jenkins_creds');
+      if (stored) {
+        try {
+          state.creds = JSON.parse(stored);
+          document.getElementById('loginModal').classList.add('hidden');
+          updateUserDisplay();
+          refreshData();
+          if (state.refreshInterval) clearInterval(state.refreshInterval);
+          state.refreshInterval = setInterval(refreshData, REFRESH_INTERVAL);
+          return;
+        } catch (e) {
+          sessionStorage.removeItem('jenkins_creds');
+        }
+      }
+      // else leave login modal visible
+    })();
+
+    // Helpful hint in console for diagnostics
+    console.log('Jenkins Dashboard loaded. If you see "Failed to fetch" errors check browser CORS or run dashboard from same origin as Jenkins.');
+  </script>
+</body>
+</html>
