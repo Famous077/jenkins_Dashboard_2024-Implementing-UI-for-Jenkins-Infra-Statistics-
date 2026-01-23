@@ -1,4 +1,5 @@
-# jenkins_Dashboard_2024-Implementing-UI-for-Jenkins-Infra-Statistics-
+# jenkins_GSoc 2024 project
+#Implementing-UI-for-Jenkins-Infra-Statistics
 # Open Source project of Jenkins
 
 This repo covers the Jenkins Open Source 2024 project “Metric Dashboard of CI/CD”, which modernizes the Jenkins Infra Statistics dashboard. It focuses on visualizing infrastructure metrics—such as build performance and usage data—through an improved UI built for stats.jenkins.io.
